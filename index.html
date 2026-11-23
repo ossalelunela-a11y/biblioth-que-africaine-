@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>La Bibliothèque Africaine</title>
+  <style>
+    :root { --bg:#f7f2ea; --dark:#1e1b18; --card:#fff; --accent:#c87d20; --green:#235c3b; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--dark); }
+    header { background:var(--dark); color:#fff; padding:14px 16px; }
+    .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
+    button, select, input { padding:8px 12px; border-radius:8px; border:1px solid #888; font-size:14px; }
+    button { background:#fff; color:var(--dark); cursor:pointer; }
+    .btn-gold { background:var(--accent); color:#fff; border:none; }
+    .btn-green { background:var(--green); color:#fff; border:none; }
+    main { max-width:920px; margin:18px auto; padding:0 14px 80px; }
+    .card { background:var(--card); border-radius:12px; padding:16px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .hidden { display:none; }
+    #ai-btn { position:fixed; bottom:16px; right:16px; background:var(--accent); color:#fff; border:none; border-radius:999px; padding:12px 18px; font-weight:bold; }
+  </style>
+</head>
+<body>
+<header>
+  <div><strong>La Bibliothèque Africaine</strong></div>
+  <div class="row">
+    <button onclick="setLang('fr')">Français</button>
+    <button onclick="setLang('en')">English</button>
+    <button onclick="setLang('pt')">Português</button>
+    <button onclick="setLang('sw')">Kiswahili</button>
+    <select id="currSelect" onchange="setCurr(this.value)">
+      <option value="FCFA">FCFA</option>
+      <option value="EUR">EUR</option>
+      <option value="USD">USD</option>
+    </select>
+  </div>
+  <nav class="row">
+    <button class="btn-gold" onclick="showTab('home')">Accueil</button>
+    <button onclick="showTab('books')">Livres PDF</button>
+    <button onclick="showTab('arts')">Illustrations &amp; Tableaux</button>
+    <button class="btn-green" onclick="showTab('account')">Compte &amp; Abonnement</button>
+    <button onclick="openAdmin()">Admin</button>
+  </nav>
+</header>
+<main>
+  <section id="tab-home" class="card">
+    <h1>Livres numériques PDF, illustrations &amp; tableaux d'Afrique</h1>
+    <p>Commandez avec bon de commande WhatsApp ou abonnez-vous au mois.</p>
+    <svg viewBox="0 0 360 180" width="100%" height="180" aria-label="Grande bibliothèque">
+      <rect x="20" y="10" width="320" height="150" rx="8" fill="#efe4d2" stroke="#1e1b18" stroke-width="2"/>
+      <rect x="35" y="48" width="290" height="7" fill="#6b3e26"/>
+      <rect x="35" y="88" width="290" height="7" fill="#6b3e26"/>
+      <rect x="35" y="128" width="290" height="7" fill="#6b3e26"/>
+      <rect x="50" y="20" width="18" height="28" fill="#c87d20"/>
+      <rect x="74" y="23" width="16" height="25" fill="#235c3b"/>
+      <rect x="96" y="18" width="20" height="30" fill="#b83b18"/>
+      <rect x="140" y="60" width="18" height="28" fill="#2e5a88"/>
+      <rect x="164" y="62" width="16" height="26" fill="#d4a017"/>
+      <rect x="210" y="100" width="18" height="28" fill="#5c3a21"/>
+      <rect x="234" y="102" width="16" height="26" fill="#235c3b"/>
+    </svg>
+  </section>
+  <section id="tab-books" class="card hidden"><h2>Livres PDF</h2><div id="books-list"></div></section>
+  <section id="tab-arts" class="card hidden"><h2>Illustrations &amp; Tableaux</h2><div id="arts-list"></div></section>
+  <section id="tab-account" class="card hidden"><h2>Compte &amp; Abonnement</h2><div id="acc-box"></div></section>
+  <section id="tab-admin" class="card hidden"><h2>Espace Admin</h2><div id="admin-box"></div></section>
+</main>
+<button id="ai-btn" onclick="askAI()">Assistant IA</button>
+<script>
+const KEY = 'biblio_af_v3';
+const RATES = { FCFA: 1, EUR: 0.001524, USD: 0.00165 };
+let db = JSON.parse(localStorage.getItem(KEY)) || {
+  lang: 'fr', currency: 'FCFA', user: null,
+  books: [
+    { id: 1, title: 'Soleils des Savanes', author: 'Amina Diop', price: 3500 },
+    { id: 2, title: 'Contes du Fleuve Congo', author: 'Kouassi Yao', price: 4000 }
+  ],
+  arts: [
+    { id: 1, title: 'Masque & Lumière', artist: 'Zola Mbeki', price: 15000 },
+    { id: 2, title: 'Crépuscule à Dakar', artist: 'Fatou Ndiaye', price: 12000 }
+  ]
+};
+const save = () => localStorage.setItem(KEY, JSON.stringify(db));
+const fmt = (fcfa) => {
+  const c = db.currency || 'FCFA';
+  const v = (fcfa * RATES[c]).toFixed(c === 'FCFA' ? 0 : 2);
+  return `${Number(v).toLocaleString()} ${c}`;
+};
+function showTab(name) {
+  ['home','books','arts','account','admin'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+  });
+  renderAll();
+}
+function setLang(l) { db.lang = l; save(); alert('Langue : ' + l.toUpperCase()); }
+function setCurr(c) { db.currency = c; save(); renderAll(); }
+function orderWA(item, price) {
+  const msg = encodeURIComponent(`Bonjour La Bibliothèque Africaine, commande : ${item} (${fmt(price)}).`);
+  window.open(`https://wa.me/?text=${msg}`, '_blank');
+}
+function renderList(elId, arr, keyName) {
+  const el = document.getElementById(elId);
+  el.innerHTML = arr.map(x => `<p><b>${x.title}</b> — ${x[keyName]} — <b>${fmt(x.price)}</b> <button class="btn-gold" onclick="orderWA('${x.title.replace(/'/g,"")}',${x.price})">WhatsApp</button></p>`).join('');
+}
+function renderAccount() {
+  const el = document.getElementById('acc-box');
+  if (!db.user) {
+    el.innerHTML = `<input id="uName" placeholder="Votre nom"><button class="btn-green" onclick="loginUser()">Connexion / Abonnement</button>`;
+  } else {
+    el.innerHTML = `<p>Membre : <b>${db.user.name}</b> | <b>Abonnement actif</b></p><button onclick="db.user=null;save();renderAccount();">Déconnexion</button>`;
+  }
+}
+function loginUser() {
+  const n = (document.getElementById('uName').value || '').trim();
+  if (!n) return alert('Entrez votre nom.');
+  db.user = { name: n, sub: true }; save(); renderAccount();
+}
+function openAdmin() {
+  const p = prompt('Mot de passe Admin :');
+  if (p !== 'afrique2026') return p !== null && alert('Mot de passe incorrect.');
+  showTab('admin');
+  document.getElementById('admin-box').innerHTML = `
+    <p>Ajouter livre PDF :</p>
+    <input id="bTitle" placeholder="Titre"><input id="bAuthor" placeholder="Auteur"><input id="bPrice" type="number" placeholder="FCFA">
+    <button class="btn-gold" onclick="addBook()">Ajouter</button>
+    <hr><p>Ajouter œuvre :</p>
+    <input id="aTitle" placeholder="Titre"><input id="aArtist" placeholder="Artiste"><input id="aPrice" type="number" placeholder="FCFA">
+    <button class="btn-green" onclick="addArt()">Ajouter</button>`;
+}
+function addBook() {
+  const title = document.getElementById('bTitle').value.trim();
+  const author = document.getElementById('bAuthor').value.trim() || 'Auteur Africain';
+  const price = Number(document.getElementById('bPrice').value) || 3000;
+  if (!title) return alert('Titre requis.');
+  db.books.push({ id: Date.now(), title, author, price }); save(); alert('Livre ajouté !');
+}
+function addArt() {
+  const title = document.getElementById('aTitle').value.trim();
+  const artist = document.getElementById('aArtist').value.trim() || 'Artiste Africain';
+  const price = Number(document.getElementById('aPrice').value) || 10000;
+  if (!title) return alert('Titre requis.');
+  db.arts.push({ id: Date.now(), title, artist, price }); save(); alert('Œuvre ajoutée !');
+}
+function askAI() {
+  const q = prompt('Assistant IA — Votre question :');
+  if (!q) return;
+  alert(`Assistant IA : Pour "${q}", consultez Livres PDF, Illustrations & Tableaux ou Compte & Abonnement.`);
+}
+function renderAll() {
+  document.getElementById('currSelect').value = db.currency || 'FCFA';
+  renderList('books-list', db.books, 'author');
+  renderList('arts-list', db.arts, 'artist');
+  renderAccount();
+}
+renderAll();
+</script>
+</body>
+</html>
